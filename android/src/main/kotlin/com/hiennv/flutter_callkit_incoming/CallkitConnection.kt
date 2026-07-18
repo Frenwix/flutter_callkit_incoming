@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap
 class CallkitConnection(
     val callId: String,
     val bundle: Bundle,
+    private val appContext: Context,
 ) : Connection() {
 
     companion object {
@@ -86,6 +87,7 @@ class CallkitConnection(
         super.onAnswer()
         Log.d(TAG, "onAnswer id=$callId")
         setActive()
+        launchAppToForeground()
     }
 
     override fun onReject() {
@@ -124,6 +126,36 @@ class CallkitConnection(
     fun markAccepted() {
         Log.d(TAG, "markAccepted id=$callId")
         setActive()
+        launchAppToForeground()
+    }
+
+    /**
+     * Bring the app's task to the foreground on answer. setActive() alone only
+     * updates Telecom's call state — it does not launch or resume any Activity.
+     * Confirmed live 2026-07-18 (Colloquial): answering via the system/Telecom
+     * call UI while the app is backgrounded-but-running left the accept event
+     * correctly processed on the Dart side (session marked handled, in-call
+     * route pushed) with nothing visible on screen, because no Activity was
+     * ever asked to come forward. Reuses the same SINGLE_TOP/REORDER_TO_FRONT/
+     * CLEAR_TOP + NEW_TASK combination as the (dormant) decline-recovery path
+     * below, chosen there to resume the existing task/Activity instance rather
+     * than create a duplicate — same requirement here. Called from inside the
+     * self-managed Connection context so the same active-call BAL exemption
+     * applies (see [markDeclined]'s doc comment on that exemption's history).
+     */
+    private fun launchAppToForeground() {
+        try {
+            val launchIntent = AppUtils.getAppIntent(appContext, null, null)
+            launchIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (launchIntent != null) {
+                appContext.startActivity(launchIntent)
+                Log.d(TAG, "launchAppToForeground: startActivity dispatched id=$callId")
+            } else {
+                Log.w(TAG, "launchAppToForeground: launchIntent null — skipped id=$callId")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "launchAppToForeground failed: ${e.message}")
+        }
     }
 
     /**
