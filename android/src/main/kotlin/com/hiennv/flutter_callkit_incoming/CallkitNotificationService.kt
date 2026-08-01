@@ -3,12 +3,15 @@ package com.hiennv.flutter_callkit_incoming
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.Service
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.util.Log
 import androidx.core.content.ContextCompat
 
 class CallkitNotificationService : Service() {
@@ -106,9 +109,34 @@ class CallkitNotificationService : Service() {
                     mask = mask or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
                 }
             }
-            startForeground(notificationId, notification, mask)
+            // The runtime mask must be a subset of the manifest-declared
+            // foregroundServiceType or Android 14+ rejects the start with
+            // IllegalArgumentException ("not a subset of foregroundServiceType
+            // attribute"). Consumers narrow the service's manifest entry via
+            // tools:replace (e.g. audio-only apps dropping microphone/camera
+            // to avoid Play Console declarations and Android 14+ mic-FGS
+            // permission checks), so honor whatever the merged manifest
+            // actually declares instead of assuming the plugin's defaults.
+            mask = mask and manifestForegroundServiceTypes()
+            if (mask != 0) {
+                startForeground(notificationId, notification, mask)
+            } else {
+                startForeground(notificationId, notification)
+            }
         } else {
             startForeground(notificationId, notification)
+        }
+    }
+
+    private fun manifestForegroundServiceTypes(): Int {
+        return try {
+            packageManager.getServiceInfo(
+                ComponentName(this, this.javaClass),
+                PackageManager.GET_META_DATA
+            ).foregroundServiceType
+        } catch (e: Exception) {
+            Log.w("CallkitNotificationService", "fgs-manifest-types lookup failed, assuming phoneCall", e)
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
         }
     }
 
