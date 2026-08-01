@@ -1,5 +1,6 @@
 package com.hiennv.flutter_callkit_incoming
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.Service
@@ -104,8 +105,18 @@ class CallkitNotificationService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             var mask = ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                mask = mask or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                if (isVideo) {
+                // Request microphone/camera types only when their runtime
+                // permission is actually granted: Android 14+ validates each
+                // requested type's permissions at start time, so a mic-type
+                // request without RECORD_AUDIO kills the accept path with a
+                // SecurityException. But when the permission IS granted the
+                // type must be requested — without the microphone type the
+                // OS cuts mic access as soon as the app leaves the
+                // foreground (e.g. the user locks the screen mid-call).
+                if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                    mask = mask or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                }
+                if (isVideo && hasPermission(Manifest.permission.CAMERA)) {
                     mask = mask or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
                 }
             }
@@ -127,6 +138,9 @@ class CallkitNotificationService : Service() {
             startForeground(notificationId, notification)
         }
     }
+
+    private fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
     private fun manifestForegroundServiceTypes(): Int {
         return try {
