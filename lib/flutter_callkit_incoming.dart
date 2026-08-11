@@ -343,11 +343,12 @@ class FlutterCallkitIncoming {
       case CallEventConstants.actionCallToggleAudioSession:
         final body = data['body'] as Map<Object?, Object?>?;
         final isActive = body?['isActive'] as bool?;
-        if (isActive == null) {
-          throw const FormatException(
-              '[ACTION_CALL_TOGGLE_AUDIO_SESSION] id is null.');
-        }
-        return CallEventActionCallToggleAudioSession(isActive);
+        // iOS delivers CallKit's didActivate/didDeactivateAudioSession here,
+        // and mid-call toggles (e.g. after another audio user deactivates the
+        // shared session) can arrive without a body. That is informational,
+        // not malformed - throwing here turns a routine audio-session toggle
+        // into a stream error for every listener of the event stream.
+        return CallEventActionCallToggleAudioSession(isActive ?? false);
       case CallEventConstants.actionCallCustom:
         final body = data['body'] as Map<String, dynamic>?;
         if (body == null) {
