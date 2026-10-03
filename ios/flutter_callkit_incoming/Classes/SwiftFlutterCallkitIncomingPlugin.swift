@@ -288,10 +288,14 @@ public class SwiftFlutterCallkitIncomingPlugin: NSObject, FlutterPlugin, CXProvi
             return
         }
         
+        // Colloquial #599: the session is configured once, before the call is
+        // reported, and never again while the call lives (Apple DTS 810385:
+        // configure fully and early; avoid session changes while calls are
+        // active). Every later setCategory/setMode emits .categoryChange,
+        // which wipes the app's standing route override (QA1754).
         self.configureAudioSession()
         self.sharedProvider?.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
             if(error == nil) {
-                self.configureAudioSession()
                 let call = Call(uuid: uuid, data: data)
                 call.handle = data.handle
                 self.callManager.addCall(call)
@@ -340,9 +344,10 @@ public class SwiftFlutterCallkitIncomingPlugin: NSObject, FlutterPlugin, CXProvi
             return
         }
         
+        // Colloquial #599: configured before the report, never after (see showCallkitIncoming above).
+        self.configureAudioSession()
         self.sharedProvider?.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
             if(error == nil) {
-                self.configureAudioSession()
                 let call = Call(uuid: uuid, data: data)
                 call.handle = data.handle
                 self.callManager.addCall(call)
@@ -568,14 +573,17 @@ public class SwiftFlutterCallkitIncomingPlugin: NSObject, FlutterPlugin, CXProvi
         if data?.configureAudioSession != false {
             let session = AVAudioSession.sharedInstance()
             do{
+                // Colloquial #599: exactly the app's call options (#826,
+                // kCallCategoryOptionsIos), so the app's own early write
+                // changes nothing and emits no .categoryChange of substance.
                 try session.setCategory(AVAudioSession.Category.playAndRecord, options: [
-                    .allowBluetoothA2DP,
-                    .duckOthers,
                     .allowBluetooth,
                 ])
                 
                 try session.setMode(self.getAudioSessionMode(data?.audioSessionMode))
-                try session.setActive(data?.audioSessionActive ?? true)
+                // Colloquial #599: no setActive. CallKit activates the session
+                // itself (didActivate); an app activation under a call loses
+                // arbitration with '!pri' (561017449) and DTS advise against it.
                 try session.setPreferredSampleRate(data?.audioSessionPreferredSampleRate ?? 44100.0)
                 try session.setPreferredIOBufferDuration(data?.audioSessionPreferredIOBufferDuration ?? 0.005)
             }catch{
@@ -653,10 +661,9 @@ public class SwiftFlutterCallkitIncomingPlugin: NSObject, FlutterPlugin, CXProvi
             action.fail()
             return
         }
-        self.configureAudioSession()
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(1200)) {
-            self.configureAudioSession()
-        }
+        // Colloquial #599: no reconfigure on answer, and no 1200ms re-fire —
+        // that second write landed after the app had configured the call and
+        // reset its mode, options and route mid-call.
 
 
         call.hasConnectDidChange = { [weak self] in
@@ -798,7 +805,8 @@ public class SwiftFlutterCallkitIncomingPlugin: NSObject, FlutterPlugin, CXProvi
             }
         }
         sendDefaultAudioInterruptionNotificationToStartAudioResource()
-        configureAudioSession()
+        // Colloquial #599: no reconfigure here — CallKit has just activated the
+        // session the app configured before the report.
 
         self.sendEvent(SwiftFlutterCallkitIncomingPlugin.ACTION_CALL_TOGGLE_AUDIO_SESSION, [ "isActivate": true ])
     }
