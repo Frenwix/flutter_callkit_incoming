@@ -34,6 +34,8 @@ dependencies {
 
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    // enableEdgeToEdge() for the incoming-call screen (Android 15, Colloquial).
+    implementation 'androidx.activity:activity-ktx:1.9.0'
     implementation 'de.hdodenhof:circleimageview:3.1.0'
     implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
     implementation 'com.fasterxml.jackson.core:jackson-core:2.11.1'

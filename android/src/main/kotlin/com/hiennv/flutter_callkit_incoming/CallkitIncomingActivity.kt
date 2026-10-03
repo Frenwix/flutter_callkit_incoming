@@ -7,7 +7,8 @@
 
 package com.hiennv.flutter_callkit_incoming
 
-import android.app.Activity
+import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
@@ -25,7 +26,6 @@ import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
-import android.view.Window
 import android.view.WindowManager
 import android.view.animation.AnimationUtils
 import android.widget.ImageView
@@ -40,7 +40,7 @@ import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
 
-class CallkitIncomingActivity : Activity() {
+class CallkitIncomingActivity : ComponentActivity() {
 
     companion object {
 
@@ -154,39 +154,14 @@ class CallkitIncomingActivity : Activity() {
         wakeLock.acquire(duration)
     }
 
+    // Colloquial: Android 15 makes targetSdk-35 apps edge-to-edge and deprecates
+    // Window.setStatusBarColor/setNavigationBarColor and the systemUiVisibility
+    // layout flags that used to do this by hand (Play Console warning,
+    // 2026-10-03). enableEdgeToEdge() draws behind transparent system bars on
+    // every API level the app supports, which is what the old code did.
     private fun transparentStatusAndNavigation() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            setWindowFlag(
-                WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS
-                        or WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION, true
-            )
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            setWindowFlag(
-                (WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS
-                        or WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION), false
-            )
-            window.statusBarColor = Color.TRANSPARENT
-            window.navigationBarColor = Color.TRANSPARENT
-        }
+        enableEdgeToEdge()
     }
-
-    private fun setWindowFlag(bits: Int, on: Boolean) {
-        val win: Window = window
-        val winParams: WindowManager.LayoutParams = win.attributes
-        if (on) {
-            winParams.flags = winParams.flags or bits
-        } else {
-            winParams.flags = winParams.flags and bits.inv()
-        }
-        win.attributes = winParams
-    }
-
 
     private fun incomingData(intent: Intent) {
         val data = intent.extras?.getBundle(CallkitConstants.EXTRA_CALLKIT_INCOMING_DATA)
