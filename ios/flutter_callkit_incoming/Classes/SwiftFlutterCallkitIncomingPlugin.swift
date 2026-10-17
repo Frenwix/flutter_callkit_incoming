@@ -578,6 +578,7 @@ public class SwiftFlutterCallkitIncomingPlugin: NSObject, FlutterPlugin, CXProvi
                 // changes nothing and emits no .categoryChange of substance.
                 try session.setCategory(AVAudioSession.Category.playAndRecord, options: [
                     .allowBluetooth,
+                    .allowBluetoothA2DP,
                 ])
                 
                 try session.setMode(self.getAudioSessionMode(data?.audioSessionMode))
