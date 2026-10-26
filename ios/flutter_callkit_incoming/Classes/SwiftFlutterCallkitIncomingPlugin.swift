@@ -72,6 +72,19 @@ public class SwiftFlutterCallkitIncomingPlugin: NSObject, FlutterPlugin, CXProvi
     public static func register(with registrar: FlutterPluginRegistrar) {
         sharePluginWithRegister(with: registrar)
     }
+
+    /// The instance a PushKit handler reports to (Colloquial). Under the UIScene
+    /// lifecycle the Flutter engine, and so register(with:), is created when the
+    /// scene connects, which on a cold launch can come after iOS has delivered
+    /// the VoIP push. iOS kills an app that accepts a VoIP push without reporting
+    /// a call, so the instance must not wait for the engine: it is created here,
+    /// and register(with:) later attaches its channels to this same instance.
+    @objc public static func sharedInstanceForPush() -> SwiftFlutterCallkitIncomingPlugin {
+        if sharedInstance == nil {
+            sharedInstance = SwiftFlutterCallkitIncomingPlugin()
+        }
+        return sharedInstance
+    }
     
     private static func createMethodChannel(messenger: FlutterBinaryMessenger) -> FlutterMethodChannel {
         return FlutterMethodChannel(name: "flutter_callkit_incoming", binaryMessenger: messenger)
@@ -82,6 +95,10 @@ public class SwiftFlutterCallkitIncomingPlugin: NSObject, FlutterPlugin, CXProvi
     }
     
     public init(messenger: FlutterBinaryMessenger) {
+        callManager = CallManager()
+    }
+
+    public override init() {
         callManager = CallManager()
     }
     
